@@ -33,9 +33,8 @@ using namespace std::string_literals;
 
 namespace forte::com_infra::secsgem {
 
-
-  TForteUInt32 CSecsgemParser::parseSystemBytes(const std::vector<std::byte> &paData) {	  
-	  TForteUInt32 value = 0;
+  TForteUInt32 CSecsgemParser::parseSystemBytes(const std::vector<std::byte> &paData) {
+    TForteUInt32 value = 0;
     if (paData.size() < 10)
       return 0;
 
@@ -58,7 +57,7 @@ namespace forte::com_infra::secsgem {
     return value;
   }
 
-  TForteUInt16 CSecsgemParser::parseDeviceId(const std::vector<std::byte>& paData) {
+  TForteUInt16 CSecsgemParser::parseDeviceId(const std::vector<std::byte> &paData) {
     TForteUInt16 value = 0;
     if (paData.size() < 2)
       return 0;
@@ -73,7 +72,7 @@ namespace forte::com_infra::secsgem {
     return static_cast<ESType>(paData[5]);
   }
 
-	void CSecsgemParser::serializeMessage(HsmsMessage &paMessage) {
+  void CSecsgemParser::serializeMessage(HsmsMessage &paMessage) {
     paMessage.mPayload.assign(14, std::byte{0}); // Initialize space for Length bytes and Header bytes,
 
     // Parse SML message
@@ -100,7 +99,7 @@ namespace forte::com_infra::secsgem {
       paMessage.mWBit = true;
       i = msg.find_first_of("<", i);
     }
-    
+
     if (msg[i] == '<') {
       auto tokens = smlLexer(msg.substr(i, msg.size() - i));
       size_t start = 0;
@@ -125,13 +124,13 @@ namespace forte::com_infra::secsgem {
     header[5] = static_cast<std::byte>(static_cast<uint8_t>(paMessage.mSType));
 
     auto systemBytes = numberToBigEndianBytes(paMessage.mSystemBytes);
-    std::copy(systemBytes.begin(), systemBytes.end(), header.begin() + 6);    
+    std::copy(systemBytes.begin(), systemBytes.end(), header.begin() + 6);
 
-    TForteUInt32 msgLen = paMessage.mPayload.size() - 4; //Header + Message Length, exclude the length bytes itself.
+    TForteUInt32 msgLen = paMessage.mPayload.size() - 4; // Header + Message Length, exclude the length bytes itself.
 
     auto length = numberToBigEndianBytes(msgLen);
     std::copy(length.begin(), length.end(), paMessage.mPayload.begin());
-	}
+  }
 
   void CSecsgemParser::parseMessage(HsmsMessage &paMessage) {
     auto header = std::span(paMessage.mPayload).subspan(0, 10);
@@ -142,14 +141,13 @@ namespace forte::com_infra::secsgem {
     paMessage.mSecsFunction = static_cast<TForteUInt8>(header[3]);
     paMessage.mPType = static_cast<TForteUInt8>(header[4]);
     paMessage.mSType = parseSType(paMessage.mPayload);
-    paMessage.mSystemBytes = parseSystemBytes(paMessage.mPayload);  
+    paMessage.mSystemBytes = parseSystemBytes(paMessage.mPayload);
 
     std::byte *text = paMessage.mPayload.data() + 10;
 
     // Add program for parsing message text here.
     paMessage.mMessageText.resize(paMessage.mPayload.size() - 10);
     memcpy(paMessage.mMessageText.data(), paMessage.mPayload.data() + 10, paMessage.mPayload.size() - 10);
-
   }
 
   // SML to SECS-II Lexer & Parsing
@@ -467,8 +465,6 @@ namespace forte::com_infra::secsgem {
     return true;
   }
 
-  
-
   template<typename T>
   bool CSecsgemParser::parseAndAppend(std::string_view paString, std::vector<std::byte> &paBuffer) {
     T value;
@@ -505,7 +501,7 @@ namespace forte::com_infra::secsgem {
     if constexpr (std::is_same_v<T, CIEC_USINT>) {
       uint8_t var;
       bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_USINT(var);      
+      return CIEC_USINT(var);
     }
     if constexpr (std::is_same_v<T, CIEC_UINT>) {
       uint16_t var;
@@ -523,7 +519,9 @@ namespace forte::com_infra::secsgem {
     }
   }
 
-  bool CSecsgemParser::deserializeMessageText(const std::vector<std::byte> &paBytes, size_t &paOffset, std::vector<DataItem> &paItems) {
+  bool CSecsgemParser::deserializeMessageText(const std::vector<std::byte> &paBytes,
+                                              size_t &paOffset,
+                                              std::vector<DataItem> &paItems) {
     size_t &i = paOffset;
     DataItem item;
     item.mType = static_cast<EKeyword>(paBytes[i] & std::byte{0b1111'1100});
@@ -531,7 +529,7 @@ namespace forte::com_infra::secsgem {
 
     i++;
 
-    switch (lengthByteSize) { 
+    switch (lengthByteSize) {
       case 1: {
         item.mSize = std::to_integer<size_t>(paBytes[i]);
         i++;
@@ -540,13 +538,13 @@ namespace forte::com_infra::secsgem {
       case 2: {
         item.mSize = std::to_integer<size_t>(paBytes[i]) << 8 | std::to_integer<size_t>(paBytes[i + 1]);
         i += 2;
-        break;      
+        break;
       }
       case 3: {
         item.mSize = std::to_integer<size_t>(paBytes[i]) << 16 | std::to_integer<size_t>(paBytes[i + 1]) << 8 |
-                       std::to_integer<size_t>(paBytes[i + 2]);
+                     std::to_integer<size_t>(paBytes[i + 2]);
         i += 3;
-        break;      
+        break;
       }
       default: return false;
     }
@@ -554,9 +552,9 @@ namespace forte::com_infra::secsgem {
     if (item.mType == e_L) { // perform recursive for list
       paItems.push_back(item);
       for (int j = 0; j < item.mSize; j++) {
-        deserializeMessageText(paBytes, i, paItems);    
+        deserializeMessageText(paBytes, i, paItems);
       }
-      
+
     } else {
       item.mData = std::span(paBytes).subspan(i, item.mSize);
       paItems.push_back(item);
@@ -564,26 +562,4 @@ namespace forte::com_infra::secsgem {
     }
     return true;
   }
-
-  inline bool CSecsgemParser::isPunctuator(const SmlToken &paToken, EPunctuator paPunctuator) {
-    if (paToken.mType != e_Punctuator)
-      return false;
-    return (std::get<EPunctuator>(paToken.mLexeme) == paPunctuator);
-  }
-
-  inline bool CSecsgemParser::isLeftAngleBrace(const SmlToken &paToken) {
-    return isPunctuator(paToken, e_LABrace);
-  }
-
-  inline bool CSecsgemParser::isRightAngleBrace(const SmlToken &paToken) {
-    return isPunctuator(paToken, e_RABrace);
-  }
-
-  inline bool CSecsgemParser::isLeftBoxBrace(const SmlToken &paToken) {
-    return isPunctuator(paToken, e_LBBrace);
-  }
-
-  inline bool CSecsgemParser::isRightBoxBrace(const SmlToken &paToken) {
-    return isPunctuator(paToken, e_RBBrace);
-  }  
 } // namespace forte::com_infra::secsgem

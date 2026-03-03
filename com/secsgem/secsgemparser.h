@@ -25,10 +25,10 @@ namespace forte::com_infra::secsgem {
 
   class CSecsgemParser {
     public:
-      static TForteUInt32 parseSystemBytes(const std::vector<std::byte>& paData);
-      static TForteUInt32 parseMessageLength(const std::vector<std::byte>& paData);
+      static TForteUInt32 parseSystemBytes(const std::vector<std::byte> &paData);
+      static TForteUInt32 parseMessageLength(const std::vector<std::byte> &paData);
       static TForteUInt16 parseDeviceId(const std::vector<std::byte> &paData);
-      static ESType parseSType(const std::vector<std::byte>& paData);
+      static ESType parseSType(const std::vector<std::byte> &paData);
 
       static void serializeMessage(HsmsMessage &paMessage);
       static void parseMessage(HsmsMessage &paMessage);
@@ -40,7 +40,8 @@ namespace forte::com_infra::secsgem {
         std::vector<DataItem> items;
         deserializeMessageText(paContent, offset, items);
         if (mapDataItem(items, data)) {
-          if (nullptr != paData) paData->setValue(data);
+          if (nullptr != paData)
+            paData->setValue(data);
         }
       }
 
@@ -66,8 +67,8 @@ namespace forte::com_infra::secsgem {
       };
 
       struct FormatPair {
-        EKeyword mFormat;
-        std::string_view mStr;
+          EKeyword mFormat;
+          std::string_view mStr;
       };
 
       static constexpr std::array<FormatPair, 15> FormatPairs{{
@@ -87,7 +88,7 @@ namespace forte::com_infra::secsgem {
           {EKeyword::e_U2, "U2"},
           {EKeyword::e_U4, "U4"},
       }};
-      
+
       static constexpr EKeyword stringToFormat(std::string_view paStr) {
         for (auto &&p : FormatPairs) {
           if (p.mStr == paStr)
@@ -95,7 +96,7 @@ namespace forte::com_infra::secsgem {
         }
         return e_Invalid;
       }
-      
+
       static constexpr std::string_view formatToString(EKeyword paFormat) {
         for (auto &&p : FormatPairs) {
           if (p.mFormat == paFormat)
@@ -116,8 +117,8 @@ namespace forte::com_infra::secsgem {
       static bool smlItemParser(std::vector<SmlToken> paTokens, size_t &paOffset, std::vector<std::byte> &paBuffer);
 
       static inline void appendToken(std::vector<SmlToken> &paToken,
-                              ETokenType paType,
-                              std::variant<std::string_view, EKeyword, EPunctuator> paLexeme) {
+                                     ETokenType paType,
+                                     std::variant<std::string_view, EKeyword, EPunctuator> paLexeme) {
         SmlToken token = {paType, paLexeme};
         paToken.emplace_back(token);
       }
@@ -146,15 +147,27 @@ namespace forte::com_infra::secsgem {
       template<typename T>
       static T decodeItem(std::span<const std::byte> paBuffer);
 
-      static inline bool isPunctuator(const SmlToken &paToken, EPunctuator paPunctuator);
+      static inline bool isPunctuator(const SmlToken &paToken, EPunctuator paPunctuator) {
+        if (paToken.mType != e_Punctuator)
+          return false;
+        return (std::get<EPunctuator>(paToken.mLexeme) == paPunctuator);
+      }
 
-      static inline bool isLeftAngleBrace(const SmlToken &paToken);
+      static inline bool isLeftAngleBrace(const SmlToken &paToken) {
+        return isPunctuator(paToken, e_LABrace);
+      }
 
-      static inline bool isRightAngleBrace(const SmlToken &paToken);
+      static inline bool isRightAngleBrace(const SmlToken &paToken) {
+        return isPunctuator(paToken, e_RABrace);
+      }
 
-      static inline bool isLeftBoxBrace(const SmlToken &paToken);
+      static inline bool isLeftBoxBrace(const SmlToken &paToken) {
+        return isPunctuator(paToken, e_LBBrace);
+      }
 
-      static inline bool isRightBoxBrace(const SmlToken &paToken);     
+      static inline bool isRightBoxBrace(const SmlToken &paToken) {
+        return isPunctuator(paToken, e_RBBrace);
+      }
 
       struct DataItem {
           EKeyword mType;
@@ -162,6 +175,7 @@ namespace forte::com_infra::secsgem {
           std::span<const std::byte> mData;
       };
 
-      static bool deserializeMessageText(const std::vector<std::byte> &paBytes, size_t &paOffset, std::vector<DataItem> & paItems);
+      static bool
+      deserializeMessageText(const std::vector<std::byte> &paBytes, size_t &paOffset, std::vector<DataItem> &paItems);
   };
 } // namespace forte::com_infra::secsgem

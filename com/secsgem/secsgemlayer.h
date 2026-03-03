@@ -38,18 +38,17 @@ namespace forte::com_infra::secsgem {
 
       const std::string &getHost() const;
 
-      TForteUInt16 getPort() const;      
+      TForteUInt16 getPort() const;
 
       TForteUInt32 getSystemBytes() const;
 
-      const HsmsSettings &getHsmsSettings() const;  
+      const HsmsSettings &getHsmsSettings() const;
 
       const HsmsMessage &getMessage() const;
 
       void receiveMessage(std::vector<std::byte> const *paMessage);
 
     private:
-
       /**
        * Parse the HSMS response and checks the returned code
        * @param paData buffer with the HSMS response
@@ -74,7 +73,7 @@ namespace forte::com_infra::secsgem {
       bool handleAddress(const char *paAddress);
 
       bool handleSession(util::CParameterParser &paParser, size_t paNoOfParameters);
-      
+
       HsmsSettings mHsmsSettings;
 
       HsmsMessage mMessage;
@@ -85,7 +84,6 @@ namespace forte::com_infra::secsgem {
       TForteUInt32 mMaxAllowed;
 
       bool mCorrectlyInitialized;
-
   };
 
 } // namespace forte::com_infra::secsgem

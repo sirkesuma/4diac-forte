@@ -57,12 +57,10 @@ namespace forte::com_infra::secsgem {
     mClientEntities.clear();
   }
 
-  EComResponse
-  CSecsgemHandler::recvData(const void *paData,
-                          unsigned int) {
+  EComResponse CSecsgemHandler::recvData(const void *paData, unsigned int) {
     arch::CIPComSocketHandler::TSocketDescriptor socket =
         *(static_cast<const arch::CIPComSocketHandler::TSocketDescriptor *>(paData));
-    
+
     char msgLenChar[4];
 
     TForteUInt32 net;
@@ -73,7 +71,7 @@ namespace forte::com_infra::secsgem {
     if (recvLen == 4) {
       sRecvBuffer.resize(msgLen);
       recvLen =
-          arch::CIPComSocketHandler::receiveDataFromTCP(socket, reinterpret_cast<char *>(sRecvBuffer.data()), msgLen);   
+          arch::CIPComSocketHandler::receiveDataFromTCP(socket, reinterpret_cast<char *>(sRecvBuffer.data()), msgLen);
       TForteUInt32 sb = CSecsgemParser::parseSystemBytes(sRecvBuffer);
       DEVLOG_INFO("[SECS/GEM Handler] Received %d bytes of message, system bytes: %d\n", recvLen, sb);
 
@@ -92,7 +90,7 @@ namespace forte::com_infra::secsgem {
   }
 
   bool CSecsgemHandler::recvClients(const arch::CIPComSocketHandler::TSocketDescriptor paSocket,
-                                  const int paRecvLength) { // check clients
+                                    const int paRecvLength) { // check clients
     util::CCriticalRegion criticalRegion(mClientMutex);
     for (auto entity = mClientEntities.begin(); entity != mClientEntities.end(); entity++) {
       if (entity->mSocket == paSocket) {
@@ -122,10 +120,9 @@ namespace forte::com_infra::secsgem {
           }
         }
 
-        else { //Handle primary or request message
+        else { // Handle primary or request message
           for (auto client = entity->mListenerLayers.begin(); client != entity->mListenerLayers.end(); client++) {
-            if (message.mSType == client->mSType && 
-                message.mSecsStream == client->mSecsStream && 
+            if (message.mSType == client->mSType && message.mSecsStream == client->mSecsStream &&
                 message.mSecsFunction == client->mSecsFunction) {
               switch (message.mSType) {
                 case e_Data: {
@@ -139,7 +136,7 @@ namespace forte::com_infra::secsgem {
               }
               return true;
             }
-          }        
+          }
         }
       }
     }
@@ -155,7 +152,7 @@ namespace forte::com_infra::secsgem {
 
   bool CSecsgemHandler::openClientConnection(const HsmsSettings &paHsmsSettings) {
     auto host = paHsmsSettings.mHost;
-    arch::CIPComSocketHandler::TSocketDescriptor newSocket = 
+    arch::CIPComSocketHandler::TSocketDescriptor newSocket =
         arch::CIPComSocketHandler::openTCPClientConnection(host.data(), paHsmsSettings.mPort);
 
     if (arch::CIPComSocketHandler::scmInvalidSocketDescriptor != newSocket) {
@@ -166,21 +163,20 @@ namespace forte::com_infra::secsgem {
       toAdd.mLastSystemBytes = 0;
       mClientEntities.emplace_back(std::move(toAdd));
       mDeviceExecution.getExtEvHandler<arch::CIPComSocketHandler>().addComCallback(newSocket, this);
-      DEVLOG_INFO("[SECS/GEM Handler]: Open client connection for %s:%u\n", paHsmsSettings.mHost.c_str(), paHsmsSettings.mPort);
+      DEVLOG_INFO("[SECS/GEM Handler]: Open client connection for %s:%u\n", paHsmsSettings.mHost.c_str(),
+                  paHsmsSettings.mPort);
       return true;
-    }
-    else {
+    } else {
       DEVLOG_ERROR("[SECS/GEM Handler]: Couldn't open client connection for %s:%u\n", paHsmsSettings.mHost.c_str(),
                    paHsmsSettings.mHost);
     }
     return false;
   }
 
-  CSecsgemHandler::HsmsClientEntity* CSecsgemHandler::getClientEntity(const HsmsSettings &paHsmsSettings) {    
+  CSecsgemHandler::HsmsClientEntity *CSecsgemHandler::getClientEntity(const HsmsSettings &paHsmsSettings) {
     HsmsClientEntity *client = nullptr;
     for (auto it = mClientEntities.begin(); it != mClientEntities.end(); ++it) {
-      if (paHsmsSettings.mHost == it->mHsmsSettings.mHost && 
-          paHsmsSettings.mPort == it->mHsmsSettings.mPort) {
+      if (paHsmsSettings.mHost == it->mHsmsSettings.mHost && paHsmsSettings.mPort == it->mHsmsSettings.mPort) {
         client = &*it;
         break;
       }
@@ -188,7 +184,7 @@ namespace forte::com_infra::secsgem {
     return client;
   }
 
-  bool CSecsgemHandler::isClientConnected(const HsmsSettings& paHsmsSettings) {
+  bool CSecsgemHandler::isClientConnected(const HsmsSettings &paHsmsSettings) {
     if (getClientEntity(paHsmsSettings) != nullptr) {
       return true;
     }
@@ -214,13 +210,14 @@ namespace forte::com_infra::secsgem {
 
     client->mListenerLayers.emplace_back(std::move(toAdd));
 
-    return true;  
-
+    return true;
   }
 
-  bool CSecsgemHandler::sendClientData(CSecsgemComLayer *paLayer, const std::vector<std::byte> &paToSend, bool paExpectReply) {
+  bool CSecsgemHandler::sendClientData(CSecsgemComLayer *paLayer,
+                                       const std::vector<std::byte> &paToSend,
+                                       bool paExpectReply) {
     arch::CIPComSocketHandler::TSocketDescriptor socket = arch::CIPComSocketHandler::scmInvalidSocketDescriptor;
-    
+
     auto &hs = paLayer->getHsmsSettings();
     HsmsClientEntity *client = getClientEntity(hs);
 
@@ -247,9 +244,8 @@ namespace forte::com_infra::secsgem {
         toAdd.mSystemBytes = paLayer->getSystemBytes();
         toAdd.mStartTime = func_NOW_MONOTONIC();
         client->mComLayers.emplace_back(std::move(toAdd));
-      }
-      else {
-        callbackClient(paLayer,0);
+      } else {
+        callbackClient(paLayer, 0);
       }
       return true;
 
@@ -263,7 +259,7 @@ namespace forte::com_infra::secsgem {
   TForteUInt32 CSecsgemHandler::getSystemBytes(const HsmsSettings &paHsmsSettings) {
     auto *client = getClientEntity(paHsmsSettings);
     if (client != nullptr) {
-      return getNextSystemBytes(*client);      
+      return getNextSystemBytes(*client);
     }
     return 0;
   }
@@ -277,16 +273,15 @@ namespace forte::com_infra::secsgem {
     return x;
   }
 
-  void CSecsgemHandler::setConnectionState(const HsmsSettings &paSettings ,EHsmsState paHsmsState) {
+  void CSecsgemHandler::setConnectionState(const HsmsSettings &paSettings, EHsmsState paHsmsState) {
     for (auto client = mClientEntities.begin(); client != mClientEntities.end(); ++client) {
-      if (paSettings.mHost == client->mHsmsSettings.mHost &&
-        paSettings.mPort == client->mHsmsSettings.mPort) {
+      if (paSettings.mHost == client->mHsmsSettings.mHost && paSettings.mPort == client->mHsmsSettings.mPort) {
         client->mState = paHsmsState;
       }
     }
   }
 
-  EHsmsState CSecsgemHandler::getConnectionState(const HsmsSettings& paSettings) {
+  EHsmsState CSecsgemHandler::getConnectionState(const HsmsSettings &paSettings) {
     EHsmsState eRetVal = e_NotConnected;
     for (auto client = mClientEntities.begin(); client != mClientEntities.end(); ++client) {
       if (paSettings.mHost == client->mHsmsSettings.mHost && paSettings.mPort == client->mHsmsSettings.mPort) {
@@ -295,7 +290,6 @@ namespace forte::com_infra::secsgem {
     }
     return eRetVal;
   }
-
 
   void CSecsgemHandler::run() {
     DEVLOG_INFO("[SECS/GEM Handler]: Starting timeout thread\n");
@@ -344,5 +338,5 @@ namespace forte::com_infra::secsgem {
   void CSecsgemHandler::selfSuspend() {
     mSuspendSemaphore.waitIndefinitely();
   }
-  
+
 } // namespace forte::com_infra::secsgem

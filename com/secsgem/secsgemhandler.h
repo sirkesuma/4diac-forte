@@ -28,102 +28,97 @@
 namespace forte::com_infra::secsgem {
   // cppcheck-suppress noConstructor
   class CSecsgemHandler : public CExternalEventHandler,
-                         public RegisterExternalEventHandler<CSecsgemHandler>,
-                         public arch::CThread,
-                         public CComCallback {
-      public:
-        explicit CSecsgemHandler(CDeviceExecution & paDeviceExecution);
-        ~CSecsgemHandler() override;
+                          public RegisterExternalEventHandler<CSecsgemHandler>,
+                          public arch::CThread,
+                          public CComCallback {
+    public:
+      explicit CSecsgemHandler(CDeviceExecution &paDeviceExecution);
+      ~CSecsgemHandler() override;
 
-        /* functions needed for the external event handler interface */
-        void enableHandler() override;
+      /* functions needed for the external event handler interface */
+      void enableHandler() override;
 
-        void disableHandler() override;
+      void disableHandler() override;
 
-        EComResponse recvData(const void *paData, unsigned int paSize) override;
+      EComResponse recvData(const void *paData, unsigned int paSize) override;
 
-   
+      bool isClientConnected(const HsmsSettings &paHsmsSettings);
 
-        bool isClientConnected(const HsmsSettings &paHsmsSettings);
+      bool openClientConnection(const HsmsSettings &paHsmsSettings);
 
-        bool openClientConnection(const HsmsSettings &paHsmsSettings);
+      bool listenClientData(CSecsgemComLayer *paLayer);
 
-        bool listenClientData(CSecsgemComLayer *paLayer);
+      bool sendClientData(CSecsgemComLayer *paLayer, const std::vector<std::byte> &paToSend, bool paExpectReply);
 
-        bool sendClientData(CSecsgemComLayer *paLayer, const std::vector<std::byte> &paToSend, bool paExpectReply);
+      TForteUInt32 getSystemBytes(const HsmsSettings &paHsmsSettings);
 
-        TForteUInt32 getSystemBytes(const HsmsSettings &paHsmsSettings);
+      void setConnectionState(const HsmsSettings &paSettings, EHsmsState paState);
+      EHsmsState getConnectionState(const HsmsSettings &paSettings);
 
-        void setConnectionState(const HsmsSettings &paSettings ,EHsmsState paState);
-        EHsmsState getConnectionState(const HsmsSettings &paSettings);
+    private:
+      /**
+       * Overridden run() from CThread which loops the UA Server.
+       */
 
+      struct ClientLayer {
+          CSecsgemComLayer *mLayer;
+          TForteUInt32 mSystemBytes;
+          CIEC_TIME mStartTime;
+      };
 
-      private:
-        /**
-         * Overridden run() from CThread which loops the UA Server.
-         */
+      struct ListenClientLayer {
+          CSecsgemComLayer *mLayer;
+          ESType mSType;
+          TForteUInt8 mSecsStream;
+          TForteUInt8 mSecsFunction;
+      };
 
-        struct ClientLayer {
-            CSecsgemComLayer *mLayer;
-            TForteUInt32 mSystemBytes;
-            CIEC_TIME mStartTime;
-        };
+      struct HsmsClientEntity {
+          HsmsSettings mHsmsSettings;
+          arch::CIPComSocketHandler::TSocketDescriptor mSocket;
+          TForteUInt16 mDeviceId;
+          EHsmsState mState;
+          TForteUInt32 mLastSystemBytes;
+          std::vector<ClientLayer> mComLayers;
+          std::vector<ListenClientLayer> mListenerLayers;
+      };
 
-        struct ListenClientLayer {
-            CSecsgemComLayer *mLayer;
-            ESType mSType;
-            TForteUInt8 mSecsStream;
-            TForteUInt8 mSecsFunction;
-        };
+      void run() override;
 
-        struct HsmsClientEntity {
-            HsmsSettings mHsmsSettings;
-            arch::CIPComSocketHandler::TSocketDescriptor mSocket;
-            TForteUInt16 mDeviceId;
-            EHsmsState mState;
-            TForteUInt32 mLastSystemBytes;
-            std::vector<ClientLayer> mComLayers;
-            std::vector<ListenClientLayer> mListenerLayers;
-        };
+      void checkClientLayers();
 
+      void checkAcceptedSockets();
 
-        void run() override;
+      void startTimeoutThread();
 
-        void checkClientLayers();
+      void stopTimeoutThread();
 
-        void checkAcceptedSockets();
+      void removeAndCloseSocket(const arch::CIPComSocketHandler::TSocketDescriptor paSocket);
 
-        void startTimeoutThread();
+      void resumeSelfsuspend();
 
-        void stopTimeoutThread();
+      void selfSuspend();
 
-        void removeAndCloseSocket(const arch::CIPComSocketHandler::TSocketDescriptor paSocket);
+      bool recvClients(const arch::CIPComSocketHandler::TSocketDescriptor paSocket, const int paRecvLength);
 
-        void resumeSelfsuspend();
+      void callbackClient(CSecsgemComLayer *paLayer, const int paRecvLength);
 
-        void selfSuspend();
+      void clearClientEntities();
 
-        bool recvClients(const arch::CIPComSocketHandler::TSocketDescriptor paSocket, const int paRecvLength);
+      std::vector<HsmsClientEntity> mClientEntities;
+      arch::CSyncObject mClientMutex;
 
-        void callbackClient(CSecsgemComLayer *paLayer, const int paRecvLength);
+      HsmsClientEntity *getClientEntity(const HsmsSettings &paHsmsSettings);
 
-        void clearClientEntities();
+      arch::CSemaphore mSuspendSemaphore;
 
-        std::vector<HsmsClientEntity> mClientEntities;
-        arch::CSyncObject mClientMutex;
+      TForteUInt32 getNextSystemBytes(HsmsClientEntity &paHsmsClientEntity);
 
-        HsmsClientEntity *getClientEntity(const HsmsSettings &paHsmsSettings);
+      static std::vector<std::byte> sRecvBuffer;
 
-        arch::CSemaphore mSuspendSemaphore;
+      static const unsigned int scmSendTimeout;
+      static const unsigned int scmAcceptedTimeout;
 
-        TForteUInt32 getNextSystemBytes(HsmsClientEntity &paHsmsClientEntity);
-
-        static std::vector<std::byte> sRecvBuffer;
-
-        static const unsigned int scmSendTimeout;
-        static const unsigned int scmAcceptedTimeout;
-
-        arch::CSemaphore mThreadStarted;
-
+      arch::CSemaphore mThreadStarted;
   };
 } // namespace forte::com_infra::secsgem

@@ -33,28 +33,28 @@ namespace forte::com_infra::secsgem {
   }
 
   CSecsgemComLayer::CSecsgemComLayer(CComLayer *paUpperLayer, CBaseCommFB *paComFB) :
-     CComLayer(paUpperLayer, paComFB),
-     mInterruptResp(e_Nothing),
-     mMaxAllowed(1024 * 1024), //Maximum allowed message length set as 1MB
-     mCorrectlyInitialized(false) {
-     mMessage.mDeviceId = 0;
-     mMessage.mWBit = false;
-     mMessage.mSecsStream = 0;
-     mMessage.mSecsFunction = 0;
-     mMessage.mPType = 0;
-     mMessage.mSType = e_Data;
-     mMessage.mSystemBytes = 0;
-   }
+      CComLayer(paUpperLayer, paComFB),
+      mInterruptResp(e_Nothing),
+      mMaxAllowed(1024 * 1024), // Maximum allowed message length set as 1MB
+      mCorrectlyInitialized(false) {
+    mMessage.mDeviceId = 0;
+    mMessage.mWBit = false;
+    mMessage.mSecsStream = 0;
+    mMessage.mSecsFunction = 0;
+    mMessage.mPType = 0;
+    mMessage.mSType = e_Data;
+    mMessage.mSystemBytes = 0;
+  }
 
   CSecsgemComLayer::~CSecsgemComLayer() {
     closeConnection();
   }
 
-  EComResponse CSecsgemComLayer::openConnection(char* paLayerParameter) {
+  EComResponse CSecsgemComLayer::openConnection(char *paLayerParameter) {
     EComResponse eRetVal = e_InitInvalidId;
     if (checkSDsAndRDsType()) {
       switch (mFb->getComServiceType()) {
-        //case e_Server: eRetVal = startServer(paLayerParameter); break;
+        // case e_Server: eRetVal = startServer(paLayerParameter); break;
         case e_Client: eRetVal = openClientConnection(paLayerParameter); break;
         case e_Subscriber: eRetVal = registerClientSubscription(paLayerParameter); break;
         default:
@@ -73,11 +73,10 @@ namespace forte::com_infra::secsgem {
     util::CParameterParser parser(paLayerParameter, ';', 4); // IP:PORT;DeviceId[;procedure-type][;SxFy | ;system-bytes]
     handleSession(parser, parser.parseParameters());
     handleAddress(parser[0]);
-    
+
     if (0 == mFb->getNumRD() && 0 == mFb->getNumSD()) { // For Select, Deselect, Linktest request
-      switch (mMessage.mSType) {       
-        case e_SelectReq: 
-        {
+      switch (mMessage.mSType) {
+        case e_SelectReq: {
           auto &handler = getExtEvHandler<CSecsgemHandler>();
           if (!handler.openClientConnection(mHsmsSettings))
             break;
@@ -88,8 +87,7 @@ namespace forte::com_infra::secsgem {
             mMessage.mDeviceId = 0xFFFF;
             mMessage.mSystemBytes = sb;
             CSecsgemParser::serializeMessage(mMessage);
-          }
-          else {
+          } else {
             break;
           }
           if (!handler.sendClientData(this, mMessage.mPayload, true))
@@ -101,13 +99,13 @@ namespace forte::com_infra::secsgem {
             eRetVal = e_InitOk;
             handler.setConnectionState(mHsmsSettings, e_Selected);
           }
-            
+
           break;
-        }          
+        }
         case e_DeselectReq: break;
         case e_LinktestReq: break;
         case e_SeparateReq: break;
-      }    
+      }
     }
 
     else if (2 == mFb->getNumRD() && 0 == mFb->getNumSD()) { // For listening to equipment data
@@ -123,8 +121,7 @@ namespace forte::com_infra::secsgem {
       }
 
     } else {
-      DEVLOG_ERROR(
-          "[SECS/GEM Layer] A client have invalid number of SD or RD \n");
+      DEVLOG_ERROR("[SECS/GEM Layer] A client have invalid number of SD or RD \n");
     }
     return eRetVal;
   }
@@ -139,13 +136,13 @@ namespace forte::com_infra::secsgem {
     if (2 == mFb->getNumRD()) {
       if (getExtEvHandler<CSecsgemHandler>().listenClientData(this)) {
         eRetVal = e_InitOk;
-      }    
+      }
     } else {
-      DEVLOG_ERROR("[SECS/GEM Layer] A subscribe have invalid number of RD \n");    
+      DEVLOG_ERROR("[SECS/GEM Layer] A subscribe have invalid number of RD \n");
     }
     return eRetVal;
   }
-  
+
   bool CSecsgemComLayer::isControlResponseReceived() {
     DEVLOG_INFO("[SECS/GEM Layer] Start T6 Timer %ds.\n", mHsmsSettings.mT6);
 
@@ -158,7 +155,6 @@ namespace forte::com_infra::secsgem {
     return false;
   }
 
-
   bool CSecsgemComLayer::checkResponseReceived(int paTimeoutDuration) {
     CIEC_TIME startTime = func_NOW_MONOTONIC();
     while (true) {
@@ -167,12 +163,11 @@ namespace forte::com_infra::secsgem {
       }
 
       if (func_NOW_MONOTONIC().getInMilliSeconds() > startTime.getInMilliSeconds() + paTimeoutDuration) {
-        
+
         return false;
       }
       forte::arch::CWin32Thread::sleepThread(100);
     }
-  
   }
 
   bool CSecsgemComLayer::checkSDsAndRDsType() const {
@@ -195,7 +190,7 @@ namespace forte::com_infra::secsgem {
       mMessage.mSType = e_Data;
       if (3 <= paNoOfParameters) {
         std::regex numRegex(R"(^\d+$)");
-        std::regex sxfyRegex(R"(^S(\d+)F(\d+)$)"); 
+        std::regex sxfyRegex(R"(^S(\d+)F(\d+)$)");
         std::smatch matches;
 
         if (!(std::regex_match(std::string(paParser[2]), numRegex) ||
@@ -223,7 +218,7 @@ namespace forte::com_infra::secsgem {
             DEVLOG_ERROR(
                 "[SECS/GEM Layer] Wrong procedure type. It should be select.req|select.rsp|deselect.req|linktest.req|"
                 "linktest.rsp|separate.req|data \n");
-          }        
+          }
         } else {
 
           int i = (3 == paNoOfParameters) ? 2 : 3;
@@ -265,7 +260,7 @@ namespace forte::com_infra::secsgem {
   }
 
   EComResponse CSecsgemComLayer::sendData(void *paData, unsigned int) {
-    mInterruptResp = e_Nothing;    
+    mInterruptResp = e_Nothing;
     if (mCorrectlyInitialized) {
       switch (mFb->getComServiceType()) {
         case e_Server: break;
@@ -273,7 +268,7 @@ namespace forte::com_infra::secsgem {
         default:
           // e_Publisher and e_Subscriber
           break;
-      } 
+      }
     } else {
       DEVLOG_ERROR("[SECS/GEM Layer]The FB is not initialized\n");
     }
@@ -300,15 +295,15 @@ namespace forte::com_infra::secsgem {
     } else {
       mInterruptResp = e_ProcessDataSendFailed;
       DEVLOG_ERROR("[SECS/GEM Layer] Sending message failed.\n");
-    }    
+    }
   }
 
   EComResponse CSecsgemComLayer::recvData(const void *paData, unsigned int paSize) {
     mInterruptResp = e_Nothing;
-    if (mCorrectlyInitialized) { 
+    if (mCorrectlyInitialized) {
       auto *data = reinterpret_cast<const std::vector<std::byte> *>(paData);
-      switch (mFb->getComServiceType()) { 
-        case e_Server: 
+      switch (mFb->getComServiceType()) {
+        case e_Server:
           // To be handled.
           break;
         case e_Client: {
@@ -317,7 +312,7 @@ namespace forte::com_infra::secsgem {
               mInterruptResp = e_ProcessDataOk;
             } else {
               mInterruptResp = e_ProcessDataRecvFaild;
-            }            
+            }
           } else {
             receiveMessage(data);
             mInterruptResp = e_ProcessDataOk;
@@ -334,7 +329,7 @@ namespace forte::com_infra::secsgem {
     }
     if (e_ProcessDataOk == mInterruptResp) {
       mFb->interruptCommFB(this);
-    }    
+    }
     return mInterruptResp;
   }
 
@@ -354,7 +349,7 @@ namespace forte::com_infra::secsgem {
       case e_RejectReq: sType = "Control message: reject.req"; break;
       case e_SeparateReq: sType = "Control message: separate.req"; break;
       case e_Data: {
-        //apoRDs[0]->setValue({}); // Need to add the output assignment
+        // apoRDs[0]->setValue({}); // Need to add the output assignment
         break;
       }
     }
@@ -373,10 +368,9 @@ namespace forte::com_infra::secsgem {
   }
 
   void CSecsgemComLayer::closeConnection() {
-
   }
 
-  const std::string &CSecsgemComLayer::getHost() const{
+  const std::string &CSecsgemComLayer::getHost() const {
     return mHsmsSettings.mHost;
   }
 
@@ -384,16 +378,16 @@ namespace forte::com_infra::secsgem {
     return mHsmsSettings.mPort;
   }
 
-  const HsmsSettings& CSecsgemComLayer::getHsmsSettings() const {
+  const HsmsSettings &CSecsgemComLayer::getHsmsSettings() const {
     return mHsmsSettings;
   }
 
-  const HsmsMessage& CSecsgemComLayer::getMessage() const {
+  const HsmsMessage &CSecsgemComLayer::getMessage() const {
     return mMessage;
   }
 
   TForteUInt32 CSecsgemComLayer::getSystemBytes() const {
     return mMessage.mSystemBytes;
   }
-  
+
 } // namespace forte::com_infra::secsgem

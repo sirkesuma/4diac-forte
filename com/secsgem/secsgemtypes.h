@@ -33,45 +33,40 @@ namespace forte::com_infra::secsgem {
     e_Data = 0
   };
 
-  enum EHsmsState {
-      e_NotConnected,
-      e_NotSelected,
-      e_Selected
-  };
+  enum EHsmsState { e_NotConnected, e_NotSelected, e_Selected };
 
   struct HsmsSettings {
 
-    /* SECS/GEM Host */
-    std::string mHost;
-    /* Port of the host */
-    TForteUInt16 mPort;
+      /* SECS/GEM Host */
+      std::string mHost;
+      /* Port of the host */
+      TForteUInt16 mPort;
 
-    EHsmsMode mHsmsMode;
+      EHsmsMode mHsmsMode;
 
-    int mT3 = 45;
-    int mT5 = 10;
-    int mT6 = 5;
-    int mT7 = 10;
-    int mT8 = 5;
+      int mT3 = 45;
+      int mT5 = 10;
+      int mT6 = 5;
+      int mT7 = 10;
+      int mT8 = 5;
   };
 
   struct HsmsMessage {
-    /* Device ID*/
-    TForteUInt16 mDeviceId = 0;
-    bool mWBit = false;
-    TForteUInt8 mSecsStream = 0;
-    TForteUInt8 mSecsFunction = 0;
-    TForteUInt8 mPType = 0;
-    ESType mSType = e_Data;
-    TForteUInt32 mSystemBytes = 0;
+      /* Device ID*/
+      TForteUInt16 mDeviceId = 0;
+      bool mWBit = false;
+      TForteUInt8 mSecsStream = 0;
+      TForteUInt8 mSecsFunction = 0;
+      TForteUInt8 mPType = 0;
+      ESType mSType = e_Data;
+      TForteUInt32 mSystemBytes = 0;
 
+      std::string mSmlMessage;
 
-    std::string mSmlMessage;
-
-    /* HSMS message text */
-    std::vector<std::byte> mMessageText;
-    /* HSMS message */
-    std::vector<std::byte> mPayload;
+      /* HSMS message text */
+      std::vector<std::byte> mMessageText;
+      /* HSMS message */
+      std::vector<std::byte> mPayload;
   };
 
 } // namespace forte::com_infra::secsgem
