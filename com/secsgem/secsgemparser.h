@@ -33,18 +33,6 @@ namespace forte::com_infra::secsgem {
       static void serializeMessage(HsmsMessage &paMessage);
       static void parseMessage(HsmsMessage &paMessage);
 
-      template<typename T>
-      static void parseData(const std::vector<std::byte> &paContent, CIEC_ANY *paData) {
-        T data;
-        size_t offset = 0;
-        std::vector<DataItem> items;
-        deserializeMessageText(paContent, offset, items);
-        if (mapDataItem(items, data)) {
-          if (nullptr != paData)
-            paData->setValue(data);
-        }
-      }
-
     private:
       enum ETokenType { e_Punctuator, e_Keyword, e_Literal };
       enum EKeyword {
@@ -66,31 +54,32 @@ namespace forte::com_infra::secsgem {
         e_Invalid = 0xFF,
       };
 
-      struct FormatPair {
+      struct FormatStruct {
           EKeyword mFormat;
           std::string_view mStr;
+          size_t mSize;
       };
 
-      static constexpr std::array<FormatPair, 15> FormatPairs{{
-          {EKeyword::e_L, "L"},
-          {EKeyword::e_B, "B"},
-          {EKeyword::e_BOOLEAN, "BOOLEAN"},
-          {EKeyword::e_A, "A"},
-          {EKeyword::e_J, "J"},
-          {EKeyword::e_I8, "I8"},
-          {EKeyword::e_I1, "I1"},
-          {EKeyword::e_I2, "I2"},
-          {EKeyword::e_I4, "I4"},
-          {EKeyword::e_F8, "F8"},
-          {EKeyword::e_F4, "F4"},
-          {EKeyword::e_U8, "U8"},
-          {EKeyword::e_U1, "U1"},
-          {EKeyword::e_U2, "U2"},
-          {EKeyword::e_U4, "U4"},
+      static constexpr std::array<FormatStruct, 15> FormatStructs{{
+          {EKeyword::e_L, "L", 1},
+          {EKeyword::e_B, "B", 1},
+          {EKeyword::e_BOOLEAN, "BOOLEAN", 1},
+          {EKeyword::e_A, "A", 1},
+          {EKeyword::e_J, "J", 1},
+          {EKeyword::e_I8, "I8", 8},
+          {EKeyword::e_I1, "I1", 1},
+          {EKeyword::e_I2, "I2", 2},
+          {EKeyword::e_I4, "I4", 4},
+          {EKeyword::e_F8, "F8", 8},
+          {EKeyword::e_F4, "F4", 4},
+          {EKeyword::e_U8, "U8", 8},
+          {EKeyword::e_U1, "U1", 1},
+          {EKeyword::e_U2, "U2", 2},
+          {EKeyword::e_U4, "U4", 4},
       }};
 
       static constexpr EKeyword stringToFormat(std::string_view paStr) {
-        for (auto &&p : FormatPairs) {
+        for (auto &&p : FormatStructs) {
           if (p.mStr == paStr)
             return p.mFormat;
         }
@@ -98,11 +87,19 @@ namespace forte::com_infra::secsgem {
       }
 
       static constexpr std::string_view formatToString(EKeyword paFormat) {
-        for (auto &&p : FormatPairs) {
+        for (auto &&p : FormatStructs) {
           if (p.mFormat == paFormat)
             return p.mStr;
         }
         return {};
+      }
+
+      static constexpr size_t getFormatSize(EKeyword paFormat) {
+        for (auto &&p : FormatStructs) {
+          if (p.mFormat == paFormat)
+            return p.mSize;
+        }
+        return 0;
       }
 
       enum EPunctuator { e_LABrace, e_RABrace, e_LBBrace, e_RBBrace, e_End };
@@ -144,8 +141,7 @@ namespace forte::com_infra::secsgem {
       template<typename T>
       static bool parseAndAppend(std::string_view paString, std::vector<std::byte> &paBuffer);
 
-      template<typename T>
-      static T decodeItem(std::span<const std::byte> paBuffer);
+      static bool decodeSecs2(const std::vector<std::byte> &paSecs2, size_t &paOffset, std::string &paSml);
 
       static inline bool isPunctuator(const SmlToken &paToken, EPunctuator paPunctuator) {
         if (paToken.mType != e_Punctuator)
@@ -168,14 +164,5 @@ namespace forte::com_infra::secsgem {
       static inline bool isRightBoxBrace(const SmlToken &paToken) {
         return isPunctuator(paToken, e_RBBrace);
       }
-
-      struct DataItem {
-          EKeyword mType;
-          TForteUInt32 mSize;
-          std::span<const std::byte> mData;
-      };
-
-      static bool
-      deserializeMessageText(const std::vector<std::byte> &paBytes, size_t &paOffset, std::vector<DataItem> &paItems);
   };
 } // namespace forte::com_infra::secsgem

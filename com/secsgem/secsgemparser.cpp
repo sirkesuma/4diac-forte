@@ -363,6 +363,7 @@ namespace forte::com_infra::secsgem {
 
     return false;
   }
+
   // Helper functions
 
   std::string_view CSecsgemParser::scanAlphanumeric(std::string_view paString, int paOffset) {
@@ -476,90 +477,49 @@ namespace forte::com_infra::secsgem {
     return true;
   }
 
-  template<typename T>
-  T forte::com_infra::secsgem::CSecsgemParser::decodeItem(std::span<const std::byte> paBuffer) {
-    if constexpr (std::is_same_v<T, CIEC_BYTE>) {
-      uint8_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_BYTE(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_BOOL>) {
-      uint8_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_BOOL(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_INT>) {
-      int16_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_INT(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_DINT>) {
-      int32_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_DINT(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_USINT>) {
-      uint8_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_USINT(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_UINT>) {
-      uint16_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_UINT(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_UDINT>) {
-      uint32_t var;
-      bigEndianBytesToNumber(paBuffer, var);
-      return CIEC_UDINT(var);
-    }
-    if constexpr (std::is_same_v<T, CIEC_STRING>) {
-      std::string var(reinterpret_cast<const char *>(paBuffer.data()), paBuffer.size());
-      return CIEC_STRING(var);
-    }
-  }
-
-  bool CSecsgemParser::deserializeMessageText(const std::vector<std::byte> &paBytes,
-                                              size_t &paOffset,
-                                              std::vector<DataItem> &paItems) {
+  bool CSecsgemParser::decodeSecs2(const std::vector<std::byte> &paSecs2, size_t &paOffset, std::string &paSml) {
     size_t &i = paOffset;
-    DataItem item;
-    item.mType = static_cast<EKeyword>(paBytes[i] & std::byte{0b1111'1100});
-    uint8_t lengthByteSize = static_cast<size_t>(paBytes[i] & std::byte{0b0000'0011});
+    auto format = static_cast<EKeyword>(paSecs2[i] & std::byte{0b1111'1100});
+    uint8_t numberOfLengthBytes = static_cast<uint8_t>(paSecs2[i] & std::byte{0b0000'0011});
+
+    paSml.append("< ");
+    paSml.append(formatToString(format));
 
     i++;
 
-    switch (lengthByteSize) {
+    uint32_t dataLength;
+    switch (numberOfLengthBytes) {
       case 1: {
-        item.mSize = std::to_integer<size_t>(paBytes[i]);
+        dataLength = std::to_integer<size_t>(paSecs2[i]);
         i++;
         break;
       }
       case 2: {
-        item.mSize = std::to_integer<size_t>(paBytes[i]) << 8 | std::to_integer<size_t>(paBytes[i + 1]);
+        dataLength = std::to_integer<size_t>(paSecs2[i]) << 8 | std::to_integer<size_t>(paSecs2[i + 1]);
         i += 2;
         break;
       }
       case 3: {
-        item.mSize = std::to_integer<size_t>(paBytes[i]) << 16 | std::to_integer<size_t>(paBytes[i + 1]) << 8 |
-                     std::to_integer<size_t>(paBytes[i + 2]);
+        dataLength = std::to_integer<size_t>(paSecs2[i]) << 16 | std::to_integer<size_t>(paSecs2[i + 1]) << 8 |
+                     std::to_integer<size_t>(paSecs2[i + 2]);
         i += 3;
         break;
       }
       default: return false;
     }
 
-    if (item.mType == e_L) { // perform recursive for list
-      paItems.push_back(item);
-      for (int j = 0; j < item.mSize; j++) {
-        deserializeMessageText(paBytes, i, paItems);
-      }
+    paSml.append(" [" + std::to_string(dataLength / getFormatSize(format)) + "] ");
 
+    if (format == e_L) {
+      for (int j = 0; j < dataLength; j++) {
+        decodeSecs2(paSecs2, i, paSml);
+      }
     } else {
-      item.mData = std::span(paBytes).subspan(i, item.mSize);
-      paItems.push_back(item);
-      i += item.mSize;
+      //To add, handle the value.
     }
-    return true;
+
+    paSml.append(" >");
+
+    return false;
   }
 } // namespace forte::com_infra::secsgem
