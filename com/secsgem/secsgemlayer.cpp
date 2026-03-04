@@ -350,8 +350,7 @@ namespace forte::com_infra::secsgem {
       case e_RejectReq: sType = "Control message: reject.req"; break;
       case e_SeparateReq: sType = "Control message: separate.req"; break;
       case e_Data: {
-        CSecsgemParser::decodeMessage(mResponse.mPayload);
-        // apoRDs[0]->setValue({}); // Need to add the output assignment
+         apoRDs[0]->setValue(CIEC_STRING(CSecsgemParser::decodeMessage(mResponse.mPayload)));
         break;
       }
     }

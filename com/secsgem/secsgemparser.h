@@ -33,7 +33,7 @@ namespace forte::com_infra::secsgem {
       static void serializeMessage(HsmsMessage &paMessage);
       static void parseMessage(HsmsMessage &paMessage);
 
-      static void decodeMessage(const std::span<std::byte> &paPayload);
+      static std::string decodeMessage(const std::span<std::byte> &paHsmsMessage);
 
     private:
       enum ETokenType { e_Punctuator, e_Keyword, e_Literal };
@@ -139,6 +139,9 @@ namespace forte::com_infra::secsgem {
 
       template<typename T>
       static bool bigEndianBytesToNumber(std::span<const std::byte> paBuffer, T &paResult);
+
+      template<typename T>
+      static void bigEndianBytesToNumberString(std::span<const std::byte> paBuffer, std::string &paStr);
 
       template<typename T>
       static bool parseAndAppend(std::string_view paString, std::vector<std::byte> &paBuffer);

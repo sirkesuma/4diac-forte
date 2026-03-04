@@ -467,6 +467,13 @@ namespace forte::com_infra::secsgem {
   }
 
   template<typename T>
+  void CSecsgemParser::bigEndianBytesToNumberString(std::span<const std::byte> paBuffer, std::string &paStr) {
+    T value;
+    bigEndianBytesToNumber(paBuffer, value);
+    paStr = std::to_string(value);
+  }
+
+  template<typename T>
   bool CSecsgemParser::parseAndAppend(std::string_view paString, std::vector<std::byte> &paBuffer) {
     T value;
     if (!parseNumber(paString, &value))
@@ -477,15 +484,29 @@ namespace forte::com_infra::secsgem {
     return true;
   }
 
-  void forte::com_infra::secsgem::CSecsgemParser::decodeMessage(const std::span<std::byte> &paPayload) {
+  std::string CSecsgemParser::decodeMessage(const std::span<std::byte> &paHsmsMessage) {
+    std::string smlMessage;
 
-    // To add function for decode message header;
+    uint8_t stream = static_cast<uint8_t>(paHsmsMessage[2] & std::byte{0b0111'1111});
+    smlMessage.append("S" + std::to_string(stream));
 
-    std::string sml;
+    uint8_t function = static_cast<uint8_t>(paHsmsMessage[3]);
+    smlMessage.append("F" + std::to_string(function) + " ");
+
+    if ((paHsmsMessage[2] & std::byte{0b1000'0000}) >> 7 == std::byte{0x01}) {
+      smlMessage.append("[W] ");
+    }
+
     size_t offset = 0;
-    auto messageContent = std::span(paPayload).subspan(10, paPayload.size() - 10);
-    decodeSecs2(messageContent, offset, sml);
+    auto messageContent = std::span(paHsmsMessage).subspan(10, paHsmsMessage.size() - 10);
+    if (!decodeSecs2(messageContent, offset, smlMessage))
+      smlMessage.append(" .");
+      return smlMessage;    
+
+    return "";    
   }
+
+  
 
   bool CSecsgemParser::decodeSecs2(const std::span<std::byte> paSecs2, size_t &paOffset, std::string &paSml) {
     size_t &i = paOffset;
@@ -533,53 +554,38 @@ namespace forte::com_infra::secsgem {
     else {       
       for (int k = 0; k * formatSize < dataLength; k++) {
         std::string valStr;
+        auto buffer = std::span(paSecs2).subspan(i, formatSize);
         switch (format) {
           case e_B: {
-            uint8_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<uint8_t>(buffer, valStr);
             break;
           }
           case e_U1: {
-            uint8_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<uint8_t>(buffer, valStr);
             break;
           }
           case e_U2: {
-            uint16_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<uint16_t>(buffer, valStr);
             break;
           }
           case e_U4: {
-            uint32_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<uint32_t>(buffer, valStr);
             break;
           }
           case e_I2: {
-            int16_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<int16_t>(buffer, valStr);
             break;
           }
           case e_I4: {
-            int32_t value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<int32_t>(buffer, valStr);
             break;
           }
           case e_F4: {
-            float value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<float>(buffer, valStr);
             break;
           }
           case e_F8: {
-            double value;
-            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
-            valStr = std::to_string(value);
+            bigEndianBytesToNumberString<double>(buffer, valStr);
             break;
           }
         }
