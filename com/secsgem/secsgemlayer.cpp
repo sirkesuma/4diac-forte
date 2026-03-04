@@ -337,6 +337,7 @@ namespace forte::com_infra::secsgem {
     mResponse.mPayload.resize(paMessage->size());
     memcpy(mResponse.mPayload.data(), paMessage->data(), paMessage->size());
     CSecsgemParser::parseMessage(mResponse);
+    
     CIEC_ANY **apoRDs = mFb->getRDs();
     std::string sType;
     switch (mResponse.mSType) {
@@ -349,6 +350,7 @@ namespace forte::com_infra::secsgem {
       case e_RejectReq: sType = "Control message: reject.req"; break;
       case e_SeparateReq: sType = "Control message: separate.req"; break;
       case e_Data: {
+        CSecsgemParser::decodeMessage(mResponse.mPayload);
         // apoRDs[0]->setValue({}); // Need to add the output assignment
         break;
       }

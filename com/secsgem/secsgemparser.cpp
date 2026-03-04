@@ -477,7 +477,17 @@ namespace forte::com_infra::secsgem {
     return true;
   }
 
-  bool CSecsgemParser::decodeSecs2(const std::vector<std::byte> &paSecs2, size_t &paOffset, std::string &paSml) {
+  void forte::com_infra::secsgem::CSecsgemParser::decodeMessage(const std::span<std::byte> &paPayload) {
+
+    // To add function for decode message header;
+
+    std::string sml;
+    size_t offset = 0;
+    auto messageContent = std::span(paPayload).subspan(10, paPayload.size() - 10);
+    decodeSecs2(messageContent, offset, sml);
+  }
+
+  bool CSecsgemParser::decodeSecs2(const std::span<std::byte> paSecs2, size_t &paOffset, std::string &paSml) {
     size_t &i = paOffset;
     auto format = static_cast<EKeyword>(paSecs2[i] & std::byte{0b1111'1100});
     uint8_t numberOfLengthBytes = static_cast<uint8_t>(paSecs2[i] & std::byte{0b0000'0011});
@@ -508,14 +518,74 @@ namespace forte::com_infra::secsgem {
       default: return false;
     }
 
-    paSml.append(" [" + std::to_string(dataLength / getFormatSize(format)) + "] ");
+    auto formatSize = getFormatSize(format);
+    paSml.append(" [" + std::to_string(dataLength / formatSize) + "] ");
 
     if (format == e_L) {
       for (int j = 0; j < dataLength; j++) {
         decodeSecs2(paSecs2, i, paSml);
       }
-    } else {
-      //To add, handle the value.
+    } else if (format == e_A) {
+      auto raw = std::span(paSecs2).subspan(i, dataLength);
+      paSml.append("\"" + std::string(reinterpret_cast<const char *>(raw.data()), raw.size()) + "\"");
+      i += dataLength;
+    }
+    else {       
+      for (int k = 0; k * formatSize < dataLength; k++) {
+        std::string valStr;
+        switch (format) {
+          case e_B: {
+            uint8_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_U1: {
+            uint8_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_U2: {
+            uint16_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_U4: {
+            uint32_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_I2: {
+            int16_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_I4: {
+            int32_t value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_F4: {
+            float value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+          case e_F8: {
+            double value;
+            bigEndianBytesToNumber(std::span(paSecs2).subspan(i, formatSize), value);
+            valStr = std::to_string(value);
+            break;
+          }
+        }
+        paSml.append(" " + valStr);
+        i += formatSize;
+      }
     }
 
     paSml.append(" >");

@@ -33,6 +33,8 @@ namespace forte::com_infra::secsgem {
       static void serializeMessage(HsmsMessage &paMessage);
       static void parseMessage(HsmsMessage &paMessage);
 
+      static void decodeMessage(const std::span<std::byte> &paPayload);
+
     private:
       enum ETokenType { e_Punctuator, e_Keyword, e_Literal };
       enum EKeyword {
@@ -141,7 +143,7 @@ namespace forte::com_infra::secsgem {
       template<typename T>
       static bool parseAndAppend(std::string_view paString, std::vector<std::byte> &paBuffer);
 
-      static bool decodeSecs2(const std::vector<std::byte> &paSecs2, size_t &paOffset, std::string &paSml);
+      static bool decodeSecs2(const std::span<std::byte> paSecs2, size_t &paOffset, std::string &paSml);
 
       static inline bool isPunctuator(const SmlToken &paToken, EPunctuator paPunctuator) {
         if (paToken.mType != e_Punctuator)
