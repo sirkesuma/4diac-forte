@@ -94,7 +94,7 @@ namespace forte::com_infra::secsgem {
     if (!entity) {
       return false;
     }
-    util::CCriticalRegion criticalRegion(*entity->mMutex);
+    util::CCriticalRegion criticalRegion(mEntityMutex);
 
     // Parse header;
     auto header = std::span(sRecvBuffer).subspan(0, 10);
@@ -235,7 +235,7 @@ namespace forte::com_infra::secsgem {
             return true;
           }
         }
-        util::CCriticalRegion criticalRegion(*entity->mMutex);
+        util::CCriticalRegion criticalRegion(mEntityMutex);
         SendLayer toAdd;
         toAdd.mLayer = paLayer;
         toAdd.mSystemBytes = sBytes;
@@ -254,7 +254,7 @@ namespace forte::com_infra::secsgem {
   }
 
   TForteUInt32 CSecsgemHandler::getNextSystemBytes(HsmsEntity &paHsmsEntity) {
-    util::CCriticalRegion criticalRegion(*paHsmsEntity.mMutex);
+    util::CCriticalRegion criticalRegion(mEntityMutex);
     return ++paHsmsEntity.mLastSystemBytes;
   }
 

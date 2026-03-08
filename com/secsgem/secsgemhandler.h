@@ -80,8 +80,6 @@ namespace forte::com_infra::secsgem {
           EHsmsState mState = e_NotConnected;
           TForteUInt32 mLastSystemBytes = 0;
 
-          std::unique_ptr<arch::CSyncObject> mMutex;
-
           std::vector<SendLayer> mSendLayers;
           std::vector<ListenLayer> mListenLayers;
 
@@ -102,10 +100,9 @@ namespace forte::com_infra::secsgem {
             }
             return nullptr;
           }
-
-          HsmsEntity() : mMutex(std::make_unique<arch::CSyncObject>()) {
-          }
       };
+
+      arch::CSyncObject mEntityMutex;
 
       void run() override;
 

@@ -264,7 +264,7 @@ namespace forte::com_infra::secsgem {
             eRetval = e_ProcessDataOk;
           } else {
             eRetval = e_ProcessDataInvalidObject;
-          }         
+          }
           break;
         }
         case e_SelectReq: {
