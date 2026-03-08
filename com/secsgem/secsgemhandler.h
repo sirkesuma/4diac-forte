@@ -42,50 +42,74 @@ namespace forte::com_infra::secsgem {
 
       EComResponse recvData(const void *paData, unsigned int paSize) override;
 
-      bool isClientConnected(const HsmsSettings &paHsmsSettings);
-
-      bool openClientConnection(const HsmsSettings &paHsmsSettings);
-
-      bool listenClientData(CSecsgemComLayer *paLayer);
-
-      bool sendClientData(CSecsgemComLayer *paLayer, const std::vector<std::byte> &paToSend, bool paExpectReply);
-
-      TForteUInt32 getSystemBytes(const HsmsSettings &paHsmsSettings);
-
       void setConnectionState(const HsmsSettings &paSettings, EHsmsState paState);
       EHsmsState getConnectionState(const HsmsSettings &paSettings);
 
-    private:
-      /**
-       * Overridden run() from CThread which loops the UA Server.
-       */
+      bool initActiveConnection(const HsmsSettings &paHsmsSettings,
+                                CSecsgemComLayer *paLayer = nullptr,
+                                ESType paSType = e_Data,
+                                TForteUInt8 paStream = 0,
+                                TForteUInt8 paFunction = 0);
 
-      struct ClientLayer {
+      bool sendData(const HsmsSettings &paHsmsSetting,
+                    CSecsgemComLayer *paLayer,
+                    const std::string &paToSend = "",
+                    ESType paSessionType = e_Data,
+                    bool paIsResponse = false);
+
+    private:
+      struct SendLayer {
           CSecsgemComLayer *mLayer;
           TForteUInt32 mSystemBytes;
+          int mTimeoutMs;
           CIEC_TIME mStartTime;
       };
 
-      struct ListenClientLayer {
+      struct ListenLayer {
           CSecsgemComLayer *mLayer;
+          TForteUInt32 mSystemBytes;
           ESType mSType;
           TForteUInt8 mSecsStream;
           TForteUInt8 mSecsFunction;
       };
 
-      struct HsmsClientEntity {
+      struct HsmsEntity {
           HsmsSettings mHsmsSettings;
-          arch::CIPComSocketHandler::TSocketDescriptor mSocket;
-          TForteUInt16 mDeviceId;
-          EHsmsState mState;
-          TForteUInt32 mLastSystemBytes;
-          std::vector<ClientLayer> mComLayers;
-          std::vector<ListenClientLayer> mListenerLayers;
+          arch::CIPComSocketHandler::TSocketDescriptor mSocket = arch::CIPComSocketHandler::scmInvalidSocketDescriptor;
+          TForteUInt16 mDeviceId = 0;
+          EHsmsState mState = e_NotConnected;
+          TForteUInt32 mLastSystemBytes = 0;
+
+          std::unique_ptr<arch::CSyncObject> mMutex;
+
+          std::vector<SendLayer> mSendLayers;
+          std::vector<ListenLayer> mListenLayers;
+
+          ListenLayer *getListenLayer(CSecsgemComLayer *mLayer) {
+            for (auto layer = mListenLayers.begin(); layer != mListenLayers.end(); layer++) {
+              if (layer->mLayer = mLayer) {
+                return &*layer;
+              }
+            }
+            return nullptr;
+          }
+
+          ListenLayer *getListenLayer(ESType paSType, TForteUInt8 paStream, TForteUInt8 paFunction) {
+            for (auto layer = mListenLayers.begin(); layer != mListenLayers.end(); layer++) {
+              if (layer->mSType == paSType && layer->mSecsStream == paStream && layer->mSecsFunction == paFunction) {
+                return &*layer;
+              }
+            }
+            return nullptr;
+          }
+
+          HsmsEntity() : mMutex(std::make_unique<arch::CSyncObject>()) {
+          }
       };
 
       void run() override;
 
-      void checkClientLayers();
+      void checkActiveSendLayers();
 
       void checkAcceptedSockets();
 
@@ -99,20 +123,22 @@ namespace forte::com_infra::secsgem {
 
       void selfSuspend();
 
+      bool recvMessage(const arch::CIPComSocketHandler::TSocketDescriptor paSocket, const int paRecvLength);
+
       bool recvClients(const arch::CIPComSocketHandler::TSocketDescriptor paSocket, const int paRecvLength);
 
       void callbackClient(CSecsgemComLayer *paLayer, const int paRecvLength);
 
-      void clearClientEntities();
+      void clearEntities();
 
-      std::vector<HsmsClientEntity> mClientEntities;
-      arch::CSyncObject mClientMutex;
+      std::vector<HsmsEntity> mEntities;
 
-      HsmsClientEntity *getClientEntity(const HsmsSettings &paHsmsSettings);
+      HsmsEntity *getEntity(const HsmsSettings &paHsmsSettings);
+      HsmsEntity *getEntity(const arch::CIPComSocketHandler::TSocketDescriptor paScoket);
 
       arch::CSemaphore mSuspendSemaphore;
 
-      TForteUInt32 getNextSystemBytes(HsmsClientEntity &paHsmsClientEntity);
+      TForteUInt32 getNextSystemBytes(HsmsEntity &paHsmsEntity);
 
       static std::vector<std::byte> sRecvBuffer;
 

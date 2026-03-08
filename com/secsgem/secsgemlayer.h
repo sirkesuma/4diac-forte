@@ -36,35 +36,17 @@ namespace forte::com_infra::secsgem {
 
       EComResponse processInterrupt() override;
 
-      const std::string &getHost() const;
-
-      TForteUInt16 getPort() const;
-
-      TForteUInt32 getSystemBytes() const;
-
-      const HsmsSettings &getHsmsSettings() const;
-
-      const HsmsMessage &getMessage() const;
-
-      void receiveMessage(std::vector<std::byte> const *paMessage);
-
     private:
-      /**
-       * Parse the HSMS response and checks the returned code
-       * @param paData buffer with the HSMS response
-       * @return OK if return code is as expected
-       */
-      EComResponse handleHSMSResponse(char *paData);
-
       EComResponse openClientConnection(char *paLayerParameter);
 
-      EComResponse registerClientSubscription(char *paLayerParameter);
+      EComResponse initActiveSendLayer(char *paLayerParameter);
 
-      void sendDataAsClient(void *paData);
+      EComResponse initActiveListenLayer(char *paLayerParameter);
 
-      bool isControlResponseReceived();
+      void sendRequest(void *paData);
+      void sendResponse(void *paData);
 
-      bool checkResponseReceived(int paTimeoutDuration);
+      EComResponse receiveMessage(const std::vector<std::byte> *paData);
 
       bool checkSDsAndRDsType() const;
 
@@ -76,12 +58,12 @@ namespace forte::com_infra::secsgem {
 
       HsmsSettings mHsmsSettings;
 
-      HsmsMessage mMessage;
+      TForteUInt16 mDeviceId;
+      ESType mSessionType;
+      TForteUInt8 mExpectedStream;
+      TForteUInt8 mExpectedFunction;
 
-      HsmsMessage mResponse;
-
-      /* Maximum message length */
-      TForteUInt32 mMaxAllowed;
+      std::vector<std::byte> mRecvBuffer;
 
       bool mCorrectlyInitialized;
   };

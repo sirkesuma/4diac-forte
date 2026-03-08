@@ -19,8 +19,6 @@
 
 namespace forte::com_infra::secsgem {
 
-  enum EHsmsMode { e_Passive, e_Active };
-
   enum ESType {
     e_SelectReq = 1,
     e_SelectRsp = 2,
@@ -30,43 +28,33 @@ namespace forte::com_infra::secsgem {
     e_LinktestRsp = 6,
     e_RejectReq = 7,
     e_SeparateReq = 9,
-    e_Data = 0
+    e_Data = 0,
+    e_InvalidSession = 0xFF
   };
 
   enum EHsmsState { e_NotConnected, e_NotSelected, e_Selected };
 
+  enum EHsmsMode {
+    /*The Passive mode is used when the local entity listens for and accepts a connect procedure initiated by the Remote
+       Entity.*/
+    e_Passive,
+    /*The Active mode is used when the connect procedure initiated by the Local Entity.*/
+    e_Active
+  };
+
   struct HsmsSettings {
-
       /* SECS/GEM Host */
-      std::string mHost;
+      std::string mHost = "172.0.0.1";
       /* Port of the host */
-      TForteUInt16 mPort;
+      TForteUInt16 mPort = 5000;
 
-      EHsmsMode mHsmsMode;
+      EHsmsMode mMode = e_Active;
 
       int mT3 = 45;
       int mT5 = 10;
       int mT6 = 5;
       int mT7 = 10;
       int mT8 = 5;
-  };
-
-  struct HsmsMessage {
-      /* Device ID*/
-      TForteUInt16 mDeviceId = 0;
-      bool mWBit = false;
-      TForteUInt8 mSecsStream = 0;
-      TForteUInt8 mSecsFunction = 0;
-      TForteUInt8 mPType = 0;
-      ESType mSType = e_Data;
-      TForteUInt32 mSystemBytes = 0;
-
-      std::string mSmlMessage;
-
-      /* HSMS message text */
-      std::vector<std::byte> mMessageText;
-      /* HSMS message */
-      std::vector<std::byte> mPayload;
   };
 
 } // namespace forte::com_infra::secsgem

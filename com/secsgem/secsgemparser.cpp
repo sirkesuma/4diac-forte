@@ -33,121 +33,115 @@ using namespace std::string_literals;
 
 namespace forte::com_infra::secsgem {
 
-  TForteUInt32 CSecsgemParser::parseSystemBytes(const std::vector<std::byte> &paData) {
-    TForteUInt32 value = 0;
-    if (paData.size() < 10)
-      return 0;
-
-    auto bytes = std::span(paData).subspan(6, 4);
-
-    if (!bigEndianBytesToNumber(bytes, value))
-      return 0;
-
-    return value;
+  ESType CSecsgemParser::parseSessionType(const std::span<std::byte> paHeader) {
+    ESType sessionType = e_InvalidSession;
+    if (paHeader.size() == 10) {
+      if (paHeader[5] < std::byte{0x8} || paHeader[5] == std::byte{0x9}) {
+        sessionType = static_cast<ESType>(paHeader[5]);
+      }
+    }
+    return sessionType;
   }
 
-  TForteUInt32 CSecsgemParser::parseMessageLength(const std::vector<std::byte> &paData) {
-    TForteUInt32 value = 0;
-    if (paData.size() < 4)
-      return 0;
-
-    if (!bigEndianBytesToNumber(paData, value))
-      return 0;
-
-    return value;
-  }
-
-  TForteUInt16 CSecsgemParser::parseDeviceId(const std::vector<std::byte> &paData) {
+  TForteUInt16 CSecsgemParser::parseDeviceId(const std::span<std::byte> paHeader) {
     TForteUInt16 value = 0;
-    if (paData.size() < 2)
-      return 0;
-
-    if (!bigEndianBytesToNumber(paData, value))
-      return 0;
-
+    if (paHeader.size() == 10) {
+      auto bytes = paHeader.subspan(0, 2);
+      if (!bigEndianBytesToNumber(bytes, value))
+        value = 0;
+    }
     return value;
   }
 
-  ESType CSecsgemParser::parseSType(const std::vector<std::byte> &paData) {
-    return static_cast<ESType>(paData[5]);
+  TForteUInt32 CSecsgemParser::parseSystemBytes(const std::span<std::byte> paHeader) {
+    TForteUInt32 value = 0;
+    if (paHeader.size() == 10) {
+      auto bytes = std::span(paHeader).subspan(6, 4);
+      if (!bigEndianBytesToNumber(bytes, value))
+        value = 0;
+    }
+    return value;
   }
 
-  void CSecsgemParser::serializeMessage(HsmsMessage &paMessage) {
-    paMessage.mPayload.assign(14, std::byte{0}); // Initialize space for Length bytes and Header bytes,
+  TForteUInt8 CSecsgemParser::parseSecsStream(const std::span<std::byte> paHeader) {
+    TForteUInt8 value = 0;
+    if (paHeader.size() == 0) {
+      value = static_cast<uint8_t>(paHeader[2] & std::byte{0b0111'1111});
+    }
+    return value;
+  }
 
-    // Parse SML message
+  TForteUInt8 CSecsgemParser::parseSecsFunction(const std::span<std::byte> paHeader) {
+    TForteUInt8 value = 0;
+    if (paHeader.size() == 10) {
+      value = static_cast<uint8_t>(paHeader[3]);
+    }
+    return value;
+  }
 
-    std::string_view msg = paMessage.mSmlMessage;
-    size_t i = 0;
+  bool CSecsgemParser::parseWaitBit(const std::span<std::byte> paHeader) {
+    auto byte2 = paHeader[2];
+    auto wbit = (byte2 & std::byte{0b1000'0000}) >> 7;
+    if (wbit == std::byte(0x01)) {
+      return true;
+    }
+    return false;
+  }
 
-    i = msg.find_first_of("sS<", i);
+  std::vector<std::byte> CSecsgemParser::encodeMessage(ESType paSType,
+                                                       TForteUInt32 paSystemBytes,
+                                                       TForteUInt16 paDeviceId,
+                                                       std::string_view paSmlMessage) {
+    std::vector<std::byte> msg;
+    msg.assign(14, std::byte{0}); // initial assignment for lengt + header bytes
+    auto header = std::span(msg).subspan(4, 10);
 
-    if (i != std::string::npos && tolower(msg[i]) == 's') {
-      std::string_view str = scanNumeric(msg, ++i);
-      i += str.size();
-      parseNumber(str, &paMessage.mSecsStream);
+    auto deviceId = numberToBigEndianBytes(paDeviceId);
+    std::copy(deviceId.begin(), deviceId.end(), header.begin()); // set device ID
+
+    header[5] = static_cast<std::byte>(paSType); // set session type
+
+    auto systemBytes = numberToBigEndianBytes(paSystemBytes);
+    std::copy(systemBytes.begin(), systemBytes.end(), header.begin() + 6); // set system bytes
+
+    if (paSType == e_Data) {
+      size_t i = 0;
+      i = paSmlMessage.find_first_of("sS<", i);
+
+      if (i != std::string::npos && tolower(paSmlMessage[i]) == 's') {
+        std::string_view str = scanNumeric(paSmlMessage, ++i);
+        i += str.size();
+        TForteUInt8 stream;
+        parseNumber(str, &stream);
+        header[2] = static_cast<std::byte>(stream); // set secs stream
+      }
+
+      if (i < paSmlMessage.size() && std::tolower(paSmlMessage[i]) == 'f') {
+        std::string_view str = scanNumeric(paSmlMessage, ++i);
+        i += str.size();
+        TForteUInt8 function;
+        parseNumber(str, &function);
+        header[3] = static_cast<std::byte>(function); // set secs function
+      }
+
+      i = paSmlMessage.find_first_of("wW<", i);
+      if (i != std::string::npos && tolower(paSmlMessage[i]) == 'w') {
+        header[2] |= std::byte{1} << 7; // set WBit
+        i = paSmlMessage.find_first_of("<", i);
+      }
+
+      if (paSmlMessage[i] == '<') {
+        auto tokens = smlLexer(paSmlMessage.substr(i, paSmlMessage.size() - i));
+        size_t start = 0;
+        smlItemParser(tokens, start, msg); // add message text
+      }
     }
 
-    if (i < msg.size() && std::tolower(msg[i]) == 'f') {
-      std::string_view str = scanNumeric(msg, ++i);
-      i += str.size();
-      parseNumber(str, &paMessage.mSecsFunction);
-    }
-
-    i = msg.find_first_of("wW<", i);
-    if (i != std::string::npos && tolower(msg[i]) == 'w') {
-      paMessage.mWBit = true;
-      i = msg.find_first_of("<", i);
-    }
-
-    if (msg[i] == '<') {
-      auto tokens = smlLexer(msg.substr(i, msg.size() - i));
-      size_t start = 0;
-      smlItemParser(tokens, start, paMessage.mPayload);
-    }
-
-    // Serializing Header
-
-    auto header = std::span(paMessage.mPayload).subspan(4, 10);
-
-    auto deviceId = numberToBigEndianBytes(paMessage.mDeviceId);
-    std::copy(deviceId.begin(), deviceId.end(), header.begin());
-
-    header[2] = static_cast<std::byte>(paMessage.mSecsStream);
-    if (paMessage.mWBit)
-      header[2] |= std::byte{1} << 7;
-
-    header[3] = static_cast<std::byte>(paMessage.mSecsFunction);
-
-    header[4] = static_cast<std::byte>(paMessage.mPType);
-
-    header[5] = static_cast<std::byte>(static_cast<uint8_t>(paMessage.mSType));
-
-    auto systemBytes = numberToBigEndianBytes(paMessage.mSystemBytes);
-    std::copy(systemBytes.begin(), systemBytes.end(), header.begin() + 6);
-
-    TForteUInt32 msgLen = paMessage.mPayload.size() - 4; // Header + Message Length, exclude the length bytes itself.
-
+    TForteUInt32 msgLen = msg.size() - 4; // Header + Message Length, exclude the length bytes itself.
     auto length = numberToBigEndianBytes(msgLen);
-    std::copy(length.begin(), length.end(), paMessage.mPayload.begin());
-  }
+    std::copy(length.begin(), length.end(), msg.begin()); // set message length
 
-  void CSecsgemParser::parseMessage(HsmsMessage &paMessage) {
-    auto header = std::span(paMessage.mPayload).subspan(0, 10);
-
-    paMessage.mDeviceId = parseDeviceId(paMessage.mPayload);
-    paMessage.mWBit = (header[2] & std::byte{0x80}) != std::byte{0};
-    paMessage.mSecsStream = static_cast<TForteUInt8>(header[2] & std::byte{0x7F});
-    paMessage.mSecsFunction = static_cast<TForteUInt8>(header[3]);
-    paMessage.mPType = static_cast<TForteUInt8>(header[4]);
-    paMessage.mSType = parseSType(paMessage.mPayload);
-    paMessage.mSystemBytes = parseSystemBytes(paMessage.mPayload);
-
-    std::byte *text = paMessage.mPayload.data() + 10;
-
-    // Add program for parsing message text here.
-    paMessage.mMessageText.resize(paMessage.mPayload.size() - 10);
-    memcpy(paMessage.mMessageText.data(), paMessage.mPayload.data() + 10, paMessage.mPayload.size() - 10);
+    return msg;
   }
 
   // SML to SECS-II Lexer & Parsing
@@ -484,29 +478,27 @@ namespace forte::com_infra::secsgem {
     return true;
   }
 
-  std::string CSecsgemParser::decodeMessage(const std::span<std::byte> &paHsmsMessage) {
+  std::string CSecsgemParser::decodeMessage(const std::span<std::byte> paData) {
     std::string smlMessage;
 
-    uint8_t stream = static_cast<uint8_t>(paHsmsMessage[2] & std::byte{0b0111'1111});
+    uint8_t stream = static_cast<uint8_t>(paData[2] & std::byte{0b0111'1111});
     smlMessage.append("S" + std::to_string(stream));
 
-    uint8_t function = static_cast<uint8_t>(paHsmsMessage[3]);
+    uint8_t function = static_cast<uint8_t>(paData[3]);
     smlMessage.append("F" + std::to_string(function) + " ");
 
-    if ((paHsmsMessage[2] & std::byte{0b1000'0000}) >> 7 == std::byte{0x01}) {
+    if ((paData[2] & std::byte{0b1000'0000}) >> 7 == std::byte{0x01}) {
       smlMessage.append("[W] ");
     }
 
     size_t offset = 0;
-    auto messageContent = std::span(paHsmsMessage).subspan(10, paHsmsMessage.size() - 10);
+    auto messageContent = std::span(paData).subspan(10, paData.size() - 10);
     if (!decodeSecs2(messageContent, offset, smlMessage))
       smlMessage.append(" .");
-      return smlMessage;    
+    return smlMessage;
 
-    return "";    
+    return "";
   }
-
-  
 
   bool CSecsgemParser::decodeSecs2(const std::span<std::byte> paSecs2, size_t &paOffset, std::string &paSml) {
     size_t &i = paOffset;
@@ -550,8 +542,7 @@ namespace forte::com_infra::secsgem {
       auto raw = std::span(paSecs2).subspan(i, dataLength);
       paSml.append("\"" + std::string(reinterpret_cast<const char *>(raw.data()), raw.size()) + "\"");
       i += dataLength;
-    }
-    else {       
+    } else {
       for (int k = 0; k * formatSize < dataLength; k++) {
         std::string valStr;
         auto buffer = std::span(paSecs2).subspan(i, formatSize);

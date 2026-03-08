@@ -25,15 +25,19 @@ namespace forte::com_infra::secsgem {
 
   class CSecsgemParser {
     public:
-      static TForteUInt32 parseSystemBytes(const std::vector<std::byte> &paData);
-      static TForteUInt32 parseMessageLength(const std::vector<std::byte> &paData);
-      static TForteUInt16 parseDeviceId(const std::vector<std::byte> &paData);
-      static ESType parseSType(const std::vector<std::byte> &paData);
+      static ESType parseSessionType(const std::span<std::byte> paHeader);
+      static TForteUInt16 parseDeviceId(const std::span<std::byte> paHeader);
+      static TForteUInt32 parseSystemBytes(const std::span<std::byte> paHeader);
+      static TForteUInt8 parseSecsStream(const std::span<std::byte> paHeader);
+      static TForteUInt8 parseSecsFunction(const std::span<std::byte> paHeader);
+      static bool parseWaitBit(const std::span<std::byte> paHeader);
 
-      static void serializeMessage(HsmsMessage &paMessage);
-      static void parseMessage(HsmsMessage &paMessage);
+      static std::vector<std::byte> encodeMessage(ESType paSType,
+                                                  TForteUInt32 paSystemBytes,
+                                                  TForteUInt16 paDeviceId = 0xFFFF,
+                                                  std::string_view paSmlMessage = "");
 
-      static std::string decodeMessage(const std::span<std::byte> &paHsmsMessage);
+      static std::string decodeMessage(const std::span<std::byte> paData);
 
     private:
       enum ETokenType { e_Punctuator, e_Keyword, e_Literal };
