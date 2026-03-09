@@ -238,9 +238,7 @@ namespace forte::com_infra::secsgem {
     if (mCorrectlyInitialized) {
       auto *data = reinterpret_cast<const std::vector<std::byte> *>(paData);
       switch (mFb->getComServiceType()) {
-        case e_Server:
-          mInterruptResp = receiveMessage(data);
-          break;
+        case e_Server: mInterruptResp = receiveMessage(data); break;
         case e_Client: {
           if (paData == nullptr) { // timeout occured
             mInterruptResp = e_ProcessDataRecvFaild;

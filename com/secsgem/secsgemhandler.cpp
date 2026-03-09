@@ -135,7 +135,7 @@ namespace forte::com_infra::secsgem {
 
   bool CSecsgemHandler::initActiveConnection(const HsmsSettings &paHsmsSettings,
                                              TForteUInt16 paDeviceId,
-                                             CSecsgemComLayer *paLayer,                                             
+                                             CSecsgemComLayer *paLayer,
                                              ESType paSType,
                                              TForteUInt8 paStream,
                                              TForteUInt8 paFunction) {
@@ -234,7 +234,7 @@ namespace forte::com_infra::secsgem {
         return true;
       }
 
-      //Handle data request
+      // Handle data request
       if (sType == e_Data) {
         auto header = std::span(dataToSend).subspan(4, 10);
         bool waitbit = CSecsgemParser::parseWaitBit(header);

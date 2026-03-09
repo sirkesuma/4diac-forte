@@ -47,7 +47,7 @@ namespace forte::com_infra::secsgem {
 
       bool initActiveConnection(const HsmsSettings &paHsmsSettings,
                                 TForteUInt16 paDeviceId = 0,
-                                CSecsgemComLayer *paLayer = nullptr,                                
+                                CSecsgemComLayer *paLayer = nullptr,
                                 ESType paSType = e_Data,
                                 TForteUInt8 paStream = 0,
                                 TForteUInt8 paFunction = 0);
