@@ -67,6 +67,7 @@ namespace forte::com_infra::secsgem {
     std::memcpy(&net, msgLenChar, sizeof(msgLenChar));
     TForteUInt32 msgLen = ntohl(net);
 
+    // Handle data payload
     if (recvLen == 4) {
       sRecvBuffer.resize(msgLen);
       recvLen =
@@ -110,6 +111,7 @@ namespace forte::com_infra::secsgem {
         if (layer->mSType != sessionType || layer->mSecsStream != streamNo || layer->mSecsFunction != functionNo)
           continue;
         callbackClient(layer->mLayer, paRecvLength);
+        layer->mSystemBytes = systemBytes;
         return true;
       }
     } else { // Receiving secondary message from remote entity (a reply to a primary message that was sent earlier)
@@ -132,7 +134,8 @@ namespace forte::com_infra::secsgem {
   }
 
   bool CSecsgemHandler::initActiveConnection(const HsmsSettings &paHsmsSettings,
-                                             CSecsgemComLayer *paLayer,
+                                             TForteUInt16 paDeviceId,
+                                             CSecsgemComLayer *paLayer,                                             
                                              ESType paSType,
                                              TForteUInt8 paStream,
                                              TForteUInt8 paFunction) {
@@ -155,6 +158,7 @@ namespace forte::com_infra::secsgem {
       if (arch::CIPComSocketHandler::scmInvalidSocketDescriptor != newSocket) {
         HsmsEntity newEntity;
         newEntity.mHsmsSettings = settings;
+        newEntity.mDeviceId = paDeviceId;
         newEntity.mSocket = newSocket;
         newEntity.mState = e_NotSelected;
 
@@ -226,25 +230,26 @@ namespace forte::com_infra::secsgem {
     auto payload = reinterpret_cast<const char *>(dataToSend.data());
     auto payloadSize = static_cast<int>(dataToSend.size());
     if (payloadSize == arch::CIPComSocketHandler::sendDataOnTCP(entity->mSocket, payload, payloadSize)) {
-      if (!paIsResponse) {
-        if (sType == e_Data) {
-          auto header = std::span(dataToSend).subspan(4, 10);
-          bool waitbit = CSecsgemParser::parseWaitBit(header);
-          if (!waitbit) {
-            callbackClient(paLayer, 0);
-            return true;
-          }
-        }
-        util::CCriticalRegion criticalRegion(mEntityMutex);
-        SendLayer toAdd;
-        toAdd.mLayer = paLayer;
-        toAdd.mSystemBytes = sBytes;
-        toAdd.mTimeoutMs = (sType == e_Data) ? entity->mHsmsSettings.mT3 * 1000 : entity->mHsmsSettings.mT6 * 1000;
-        toAdd.mStartTime = func_NOW_MONOTONIC();
-        entity->mSendLayers.emplace_back(std::move(toAdd));
-      } else {
-        // Handle for data response
+      if (paIsResponse) {
+        return true;
       }
+
+      //Handle data request
+      if (sType == e_Data) {
+        auto header = std::span(dataToSend).subspan(4, 10);
+        bool waitbit = CSecsgemParser::parseWaitBit(header);
+        if (!waitbit) {
+          callbackClient(paLayer, 0);
+          return true;
+        }
+      }
+      util::CCriticalRegion criticalRegion(mEntityMutex);
+      SendLayer toAdd;
+      toAdd.mLayer = paLayer;
+      toAdd.mSystemBytes = sBytes;
+      toAdd.mTimeoutMs = (sType == e_Data) ? entity->mHsmsSettings.mT3 * 1000 : entity->mHsmsSettings.mT6 * 1000;
+      toAdd.mStartTime = func_NOW_MONOTONIC();
+      entity->mSendLayers.emplace_back(std::move(toAdd));
       return true;
     } else {
       DEVLOG_ERROR("[SECS/GEM Handler]: Couldn't send data to remote entity %s:%u\n", paHsmsSettings.mHost.c_str(),

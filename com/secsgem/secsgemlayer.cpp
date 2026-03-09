@@ -67,7 +67,7 @@ namespace forte::com_infra::secsgem {
     util::CParameterParser parser(paLayerParameter, ';', 4); // IP:PORT;DeviceId;Mode[;session-type | ;SxFy]
     if (handleSession(parser, parser.parseParameters()) && handleAddress(parser[0])) {
       if (getExtEvHandler<CSecsgemHandler>().initActiveConnection(
-              mHsmsSettings)) // call handler initActiveConnection for send layer;
+              mHsmsSettings, mDeviceId)) // call handler initActiveConnection for send layer;
         eRetVal = e_InitOk;
     }
     return eRetVal;
@@ -78,7 +78,7 @@ namespace forte::com_infra::secsgem {
     util::CParameterParser parser(paLayerParameter, ';', 4); // IP:PORT;DeviceId;Mode[;session-type | ;SxFy]
     if (handleSession(parser, parser.parseParameters()) && handleAddress(parser[0])) {
       if (getExtEvHandler<CSecsgemHandler>().initActiveConnection(
-              mHsmsSettings, this, mSessionType, mExpectedStream,
+              mHsmsSettings, mDeviceId, this, mSessionType, mExpectedStream,
               mExpectedFunction)) // call handler initActiveConnection for listen layer;
         eRetVal = e_InitOk;
     }
@@ -187,14 +187,14 @@ namespace forte::com_infra::secsgem {
     mInterruptResp = e_Nothing;
     if (mCorrectlyInitialized) {
       switch (mFb->getComServiceType()) {
-        // case e_Server: break;
+        case e_Server: sendResponse(paData); break;
         case e_Client: sendRequest(paData); break;
         default:
           // e_Publisher and e_Subscriber
           break;
       }
     } else {
-      DEVLOG_ERROR("[SECS/GEM Layer]The FB is not initialized\n");
+      DEVLOG_ERROR("[SECS/GEM Layer] The FB is not initialized\n");
     }
     return mInterruptResp;
   }
@@ -216,13 +216,30 @@ namespace forte::com_infra::secsgem {
     }
   }
 
+  void CSecsgemComLayer::sendResponse(void *paData) {
+    std::string smlMessage = "";
+    if (mSessionType == e_Data) {
+      if (CIEC_ANY::e_WSTRING == getSDx(paData, 0).getDataTypeID()) {
+        smlMessage = static_cast<const CIEC_WSTRING &>(getSDx(paData, 0)).getValue();
+      } else if (CIEC_ANY::e_STRING == getSDx(paData, 0).getDataTypeID()) {
+        smlMessage = static_cast<const CIEC_STRING &>(getSDx(paData, 0)).getStorage();
+      }
+    }
+    if (getExtEvHandler<CSecsgemHandler>().sendData(mHsmsSettings, this, smlMessage, mSessionType, true)) {
+      mInterruptResp = e_ProcessDataOk;
+    } else {
+      mInterruptResp = e_ProcessDataSendFailed;
+      DEVLOG_ERROR("[SECS/GEM Layer] Sending message failed.\n");
+    }
+  }
+
   EComResponse CSecsgemComLayer::recvData(const void *paData, unsigned int paSize) {
     mInterruptResp = e_Nothing;
     if (mCorrectlyInitialized) {
       auto *data = reinterpret_cast<const std::vector<std::byte> *>(paData);
       switch (mFb->getComServiceType()) {
         case e_Server:
-          // To be handled.
+          mInterruptResp = receiveMessage(data);
           break;
         case e_Client: {
           if (paData == nullptr) { // timeout occured

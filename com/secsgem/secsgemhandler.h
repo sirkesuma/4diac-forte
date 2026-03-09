@@ -46,7 +46,8 @@ namespace forte::com_infra::secsgem {
       EHsmsState getConnectionState(const HsmsSettings &paSettings);
 
       bool initActiveConnection(const HsmsSettings &paHsmsSettings,
-                                CSecsgemComLayer *paLayer = nullptr,
+                                TForteUInt16 paDeviceId = 0,
+                                CSecsgemComLayer *paLayer = nullptr,                                
                                 ESType paSType = e_Data,
                                 TForteUInt8 paStream = 0,
                                 TForteUInt8 paFunction = 0);
@@ -107,8 +108,6 @@ namespace forte::com_infra::secsgem {
       void run() override;
 
       void checkActiveSendLayers();
-
-      void checkAcceptedSockets();
 
       void startTimeoutThread();
 

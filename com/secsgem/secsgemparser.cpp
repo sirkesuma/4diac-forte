@@ -65,7 +65,7 @@ namespace forte::com_infra::secsgem {
 
   TForteUInt8 CSecsgemParser::parseSecsStream(const std::span<std::byte> paHeader) {
     TForteUInt8 value = 0;
-    if (paHeader.size() == 0) {
+    if (paHeader.size() == 10) {
       value = static_cast<uint8_t>(paHeader[2] & std::byte{0b0111'1111});
     }
     return value;
